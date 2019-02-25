@@ -30,8 +30,6 @@
 // Return a string containing the current working directory.
 char* get_current_directory(bool* should_free) {
   // Get the current working directory. This will fix the prompt path.
-
-  // Change this to true if necessary
   char buf[BUFSIZE];
   *should_free = false;
   long size = pathconf(".", _PC_PATH_MAX);//
@@ -40,14 +38,16 @@ char* get_current_directory(bool* should_free) {
 
 // Returns the value of an environment variable env_var
 const char* lookup_env(const char* env_var) {
-  // TODO: Lookup environment variables. This is required for parser to be able
-  // to interpret variables from the command line and display the prompt
-  // correctly
-  // HINT: This should be pretty simple
-  IMPLEMENT_ME();
 
-  // TODO: Remove warning silencers
-  (void) env_var; // Silence unused variable warning
+	//**************
+	//TODO: MAKE SURE THIS WORKS I HAVEN'T BEEN ABLE TO TRY IT
+	//**************
+
+	char *buf = NULL;//buffer to store our return value in
+	if((buf = getenv(env_var)) != NULL)//this checks to make sure the variable exists
+	{
+		return buf;
+	}
 
   return "???";
 }
@@ -146,12 +146,14 @@ void run_cd(CDCommand cmd) {
     return;
   }
 
-  // TODO: Change directory
-
-  // TODO: Update the PWD environment variable to be the new current working
-  // directory and optionally update OLD_PWD environment variable to be the old
-  // working directory.
-  IMPLEMENT_ME();
+  if(chdir(dir))//if we can successfully change working directory
+  {
+	  //setenv(variable name, new value, overwrite)
+	  //sets old working directory to previous directory,
+	  char* OLD_PWD;
+	  setenv(OLD_PWD,PWD,1);
+	  setenv(PWD,dir,1);
+  }
 }
 
 // Sends a signal to all processes contained in a job
