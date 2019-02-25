@@ -170,11 +170,16 @@ void run_kill(KillCommand cmd) {
 
 // Prints the current working directory to stdout
 void run_pwd() {
-  // TODO: Print the current working directory
-  IMPLEMENT_ME();
-
-  // Flush the buffer before returning
-  fflush(stdout);
+	char *pwd_str;//char array to hold our directory
+    //bzero(pwd_str,BUFSIZE);//zero every entry
+    bool should_free;
+    pwd_str = get_current_directory(&should_free);
+    printf("%s\n",pwd_str);
+    if(should_free)
+    {
+  	  free(pwd_str);
+    }
+    fflush(stdout);
 }
 
 // Prints all background jobs currently in the job list to stdout
@@ -263,6 +268,8 @@ void parent_run_command(Command cmd) {
   case GENERIC:
   case ECHO:
   case PWD:
+  	run_pwd();
+	break;
   case JOBS:
   case EXIT:
   case EOC:
