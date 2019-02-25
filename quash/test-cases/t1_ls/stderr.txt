@@ -1,0 +1,5 @@
+==1792== Memcheck, a memory error detector
+==1792== Copyright (C) 2002-2017, and GNU GPL'd, by Julian Seward et al.
+==1792== Using Valgrind-3.13.0 and LibVEX; rerun with -h for copyright info
+==1792== Command: /home/dgonzalez/Documents/EECS678/EECS678/Project/quash/quash
+==1792== 

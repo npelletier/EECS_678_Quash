@@ -1,0 +1,5 @@
+==2219== Memcheck, a memory error detector
+==2219== Copyright (C) 2002-2017, and GNU GPL'd, by Julian Seward et al.
+==2219== Using Valgrind-3.13.0 and LibVEX; rerun with -h for copyright info
+==2219== Command: /home/dgonzalez/Documents/EECS678/EECS678/Project/quash/quash
+==2219== 
