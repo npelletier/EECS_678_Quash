@@ -119,7 +119,6 @@ void run_echo(EchoCommand cmd) {
     printf("%s ", str[i]);
 
   printf('\n');
-  fflush(stdout);
 
 
   // Flush the buffer before returning
@@ -133,12 +132,13 @@ void run_export(ExportCommand cmd) {
   const char* val = cmd.val;
 
   // TODO: Remove warning silencers
-  (void) env_var; // Silence unused variable warning
-  (void) val;     // Silence unused variable warning
+  //(void) env_var; // Silence unused variable warning
+  //(void) val;     // Silence unused variable warning
 
   // TODO: Implement export.
   // HINT: This should be quite simple.
-  IMPLEMENT_ME();
+  //IMPLEMENT_ME();
+  setenv(env_var, val, 1);
 }
 
 // Changes the current working directory
@@ -275,6 +275,7 @@ void parent_run_command(Command cmd) {
 
   case GENERIC:
   case ECHO:
+    run_echo(cmd.echo);
   case PWD:
   	run_pwd();
 	break;
