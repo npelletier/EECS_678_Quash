@@ -13,7 +13,14 @@
 #include <stdlib.h>
 #include "quash.h"
 #include <unistd.h>
+#include "deque.h"
 
+//need these calls to generate our pid queue per instructions in deque.h
+//pid_queue will hold the int process ids
+//this queue should probably be generated in run_script, passed to
+//		run_process(?) and check_jobs_bg_status so they can see all processes
+IMPLEMENT_DEQUE_STRUCT(pid_queue, int);
+IMPLEMENT_DEQUE(pid_queue,int);
 
 // Remove this and all expansion calls to it
 /**
@@ -117,8 +124,9 @@ void run_echo(EchoCommand cmd) {
   // TODO: Implement echo
   //IMPLEMENT_ME();
   for (int i=0; str[i] != NULL; i++)
+  {
     printf("%s ", str[i]);
-
+}
   printf('\n');
 
 
@@ -276,10 +284,7 @@ void parent_run_command(Command cmd) {
 
   case GENERIC:
   case ECHO:
-    run_echo(cmd.echo);
   case PWD:
-  	run_pwd();
-	break;
   case JOBS:
   case EXIT:
   case EOC:
