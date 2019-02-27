@@ -14,14 +14,16 @@
 #include "quash.h"
 #include <unistd.h>
 #include "deque.h"
+#include <sys/wait.h>//for waitpid() call
 
 //need these calls to generate our pid queue per instructions in deque.h
 //pid_queue will hold the int process ids
 //this queue should probably be generated in run_script, passed to
 //		run_process(?) and check_jobs_bg_status so they can see all processes
-IMPLEMENT_DEQUE_STRUCT(pid_queue, int);
-IMPLEMENT_DEQUE(pid_queue,int);
+IMPLEMENT_DEQUE_STRUCT (pid_queue, int);
+IMPLEMENT_DEQUE (pid_queue,int);
 
+pid_queue pids;
 // Remove this and all expansion calls to it
 /**
  * @brief Note calls to any function that requires implementation
@@ -337,7 +339,14 @@ void create_process(CommandHolder holder) {
 // Run a list of commands
 void run_script(CommandHolder* holders) {
   if (holders == NULL)
+  {
     return;
+  }
+
+  //each call to run_script creates a new job
+  //each job has its own PID queue
+  //we can use pids in run_process or any other function call in this job
+  pids = new_pid_queue(1);
 
   check_jobs_bg_status();
 
@@ -348,7 +357,6 @@ void run_script(CommandHolder* holders) {
   }
 
   CommandType type;
-
   // Run all commands in the `holder` array
   for (int i = 0; (type = get_command_holder_type(holders[i])) != EOC; ++i)
     create_process(holders[i]);
@@ -366,4 +374,5 @@ void run_script(CommandHolder* holders) {
     // TODO: Once jobs are implemented, uncomment and fill the following line
     // print_job_bg_start(job_id, pid, cmd);
   }
+  destroy_pid_queue(&pids);
 }
