@@ -329,7 +329,7 @@ void parent_run_command(Command cmd) {
  *
  * @sa Command CommandHolder
  */
-void create_process(CommandHolder holder,pid_queue pid_list) {
+void create_process(CommandHolder holder, pid_queue* pid_list) {
   // Read the flags field from the parser
   bool p_in  = holder.flags & PIPE_IN;
   bool p_out = holder.flags & PIPE_OUT;
@@ -346,11 +346,37 @@ void create_process(CommandHolder holder,pid_queue pid_list) {
   (void) r_app; // Silence unused variable warning
 
   // TODO: Setup pipes, redirects, and new process
-  IMPLEMENT_ME();
+  // IMPLEMENT_ME();
 
-  parent_run_command(holder.cmd); // This should be done in the parent branch of
+
+    int pid;
+
+    int p[2][2];
+
+    pid = fork();
+    push_back_pid_queue(&pid_list,pid);
+    if(pid == 0)
+    {
+      child_run_command(holder.cmd); // This should be done in the child branch of a fork
+      if(p_in)
+      {
+
+      }
+      if(p_out)
+      {
+
+      }
+
+    }
+
+    else
+    {
+      parent_run_command(holder.cmd); // This should be done in the parent branch of a fork
+    }
+
+  //parent_run_command(holder.cmd); // This should be done in the parent branch of
                                   // a fork
-  child_run_command(holder.cmd); // This should be done in the child branch of a fork
+  //child_run_command(holder.cmd); // This should be done in the child branch of a fork
 }
 
 // Run a list of commands
@@ -373,15 +399,18 @@ void run_script(CommandHolder* holders) {
   CommandType type;
   // Run all commands in the `holder` array
   for (int i = 0; (type = get_command_holder_type(holders[i])) != EOC; ++i)
-    create_process(holders[i],this_job.pid_list);
+    create_process(holders[i],&this_job.pid_list);
 
   if (!(holders[0].flags & BACKGROUND)) {
     // Not a background Job
-  	int status;
-	waitpid(peek_back_pid_queue(&this_job.pid_list),&status,1);
-    // TODO: Wait for all processes under the job to complete
-    //IMPLEMENT_ME();
-	destroy_pid_queue(&this_job.pid_list);
+    if(!is_empty_pid_queue(&this_job.pid_list))
+    {
+    	int status;
+  	   waitpid(peek_back_pid_queue(&this_job.pid_list),&status,1);
+      // TODO: Wait for all processes under the job to complete
+      //IMPLEMENT_ME();
+  	   destroy_pid_queue(&this_job.pid_list);
+    }
   }
   else {
 	  push_back_job_queue(&big_job_queue,this_job);
