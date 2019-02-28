@@ -23,7 +23,18 @@
 IMPLEMENT_DEQUE_STRUCT (pid_queue, int);
 IMPLEMENT_DEQUE (pid_queue,int);
 
-pid_queue pids;
+typedef struct job {
+  int job_id;
+  pid_queue pid_list;
+  char* command_string;//to print the cmd line input when calling jobs
+} job;
+
+IMPLEMENT_DEQUE_STRUCT (job_queue, job);
+IMPLEMENT_DEQUE (job_queue, job);
+
+int num_jobs = 0;
+
+job_queue big_job_queue;
 
 // Remove this and all expansion calls to it
 /**
@@ -67,8 +78,8 @@ void check_jobs_bg_status() {
   // TODO: Check on the statuses of all processes belonging to all background
   // jobs. This function should remove jobs from the jobs queue once all
   // processes belonging to a job have completed.
-  // int jobLen = length_JobDeque(&jobs);
-  // for(int i=0;i<jobLen;i++)
+  // int jobLen = length_job_queue(&jobs);
+  // for(int i=0;i<num_jobs;i++)
   // {
   //   Job temp = pop_front_JobDeque(&jobs);
   //   int pidLen = length_PIDDeque()
@@ -318,7 +329,7 @@ void parent_run_command(Command cmd) {
  *
  * @sa Command CommandHolder
  */
-void create_process(CommandHolder holder) {
+void create_process(CommandHolder holder,pid_queue pid_list) {
   // Read the flags field from the parser
   bool p_in  = holder.flags & PIPE_IN;
   bool p_out = holder.flags & PIPE_OUT;
@@ -348,37 +359,39 @@ void run_script(CommandHolder* holders) {
   {
     return;
   }
-
-  //each call to run_script creates a new job
-  //each job has its own PID queue
-  //we can use pids in run_process or any other function call in this job
-  pids = new_pid_queue(1);
-
   check_jobs_bg_status();
-
+  big_job_queue = new_job_queue(1);
   if (get_command_holder_type(holders[0]) == EXIT &&
       get_command_holder_type(holders[1]) == EOC) {
     end_main_loop();
     return;
   }
+  job_queue* jobs_ptr = &big_job_queue;
+
+  job this_job = {.job_id = ++num_jobs,.pid_list = new_pid_queue(1), .command_string = get_command_string()};
 
   CommandType type;
   // Run all commands in the `holder` array
   for (int i = 0; (type = get_command_holder_type(holders[i])) != EOC; ++i)
-    create_process(holders[i]);
+    create_process(holders[i],this_job.pid_list);
 
   if (!(holders[0].flags & BACKGROUND)) {
     // Not a background Job
+  	int status;
+	waitpid(peek_back_pid_queue(&this_job.pid_list),&status,1);
     // TODO: Wait for all processes under the job to complete
-    IMPLEMENT_ME();
+    //IMPLEMENT_ME();
+	destroy_pid_queue(&this_job.pid_list);
   }
   else {
+	  push_back_job_queue(&big_job_queue,this_job);
+	  num_jobs++;
     // A background job.
     // TODO: Push the new job to the job queue
-    IMPLEMENT_ME();
+    //IMPLEMENT_ME();
 
     // TODO: Once jobs are implemented, uncomment and fill the following line
-    // print_job_bg_start(job_id, pid, cmd);
+      print_job_bg_start(this_job.job_id, peek_front_pid_queue(&this_job.pid_list), this_job.command_string);
   }
-  destroy_pid_queue(&pids);
+  //destroy_pid_queue(&pids);
 }
