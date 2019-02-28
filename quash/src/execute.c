@@ -24,6 +24,7 @@ IMPLEMENT_DEQUE_STRUCT (pid_queue, int);
 IMPLEMENT_DEQUE (pid_queue,int);
 
 pid_queue pids;
+
 // Remove this and all expansion calls to it
 /**
  * @brief Note calls to any function that requires implementation
@@ -66,8 +67,12 @@ void check_jobs_bg_status() {
   // TODO: Check on the statuses of all processes belonging to all background
   // jobs. This function should remove jobs from the jobs queue once all
   // processes belonging to a job have completed.
-  IMPLEMENT_ME();
-
+  // int jobLen = length_JobDeque(&jobs);
+  // for(int i=0;i<jobLen;i++)
+  // {
+  //   Job temp = pop_front_JobDeque(&jobs);
+  //   int pidLen = length_PIDDeque()
+  // }
   // TODO: Once jobs are implemented, uncomment and fill the following line
   // print_job_bg_complete(job_id, pid, cmd);
 }
@@ -125,11 +130,12 @@ void run_echo(EchoCommand cmd) {
 
   // TODO: Implement echo
   //IMPLEMENT_ME();
-  for (int i=0; str[i] != NULL; i++)
+
+  for (char** i =str; *i != NULL; ++i)
   {
-    printf("%s ", str[i]);
-}
-  printf('\n');
+    printf("%s ", *i);
+  }
+  printf("\n");
 
 
   // Flush the buffer before returning
