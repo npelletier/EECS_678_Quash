@@ -450,9 +450,6 @@ void create_process(CommandHolder holder, pid_queue* pid_list) {
     parent_run_command(holder.cmd); // This should be done in the parent branch of a fork
   }
 
-  current_pipe++;
-
-
   //parent_run_command(holder.cmd); // This should be done in the parent branch of
                                   // a fork
   //child_run_command(holder.cmd); // This should be done in the child branch of a fork
@@ -496,10 +493,11 @@ void run_script(CommandHolder* holders) {
       //IMPLEMENT_ME();
     }
 	delete_job(&this_job);
+	num_jobs--;
   }
   else {
 	  push_back_job_queue(&big_job_queue,this_job);
-	  num_jobs++;
+	  num_jobs;
     // A background job.
     // TODO: Push the new job to the job queue
     //IMPLEMENT_ME();
