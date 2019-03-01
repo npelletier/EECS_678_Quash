@@ -15,6 +15,7 @@
 #include <unistd.h>
 #include "deque.h"
 #include <sys/wait.h>//for waitpid() call
+#include <signal.h>
 
 //need these calls to generate our pid queue per instructions in deque.h
 //pid_queue will hold the int process ids
@@ -247,11 +248,30 @@ void run_kill(KillCommand cmd) {
   int job_id = cmd.job;
 
   // TODO: Remove warning silencers
-  (void) signal; // Silence unused variable warning
-  (void) job_id; // Silence unused variable warning
+  //(void) signal; // Silence unused variable warning
+  //(void) job_id; // Silence unused variable warning
 
   // TODO: Kill all processes associated with a background job
-  IMPLEMENT_ME();
+  if(job_id <= num_jobs && job_id > -1)
+  {
+    job temp;
+    for(int i = 0; i < num_jobs;i++)
+    {
+      temp = pop_front_job_queue(&big_job_queue);
+      if((temp.job_id) == job_id)
+      {
+        int pid_length = length_pid_queue(&temp.pid_list);
+        pid_t this_pid;
+        for(int j = 0; j < pid_length; j++)
+        {
+          this_pid = pop_front_pid_queue(&temp.pid_list);
+          kill(this_pid,SIGINT);
+          push_back_pid_queue(&temp.pid_list,this_pid);
+        }
+      }
+      push_back_job_queue(&big_job_queue,temp);
+    }
+  }
 }
 
 
@@ -402,18 +422,20 @@ void create_process(CommandHolder holder, pid_queue* pid_list) {
                                                // is true
 
   // TODO: Remove warning silencers
-  (void) p_in;  // Silence unused variable warning
-  (void) p_out; // Silence unused variable warning
-  (void) r_in;  // Silence unused variable warning
-  (void) r_out; // Silence unused variable warning
-  (void) r_app; // Silence unused variable warning
+  // (void) p_in;  // Silence unused variable warning
+  // (void) p_out; // Silence unused variable warning
+  // (void) r_in;  // Silence unused variable warning
+  // (void) r_out; // Silence unused variable warning
+  // (void) r_app; // Silence unused variable warning
 
   // TODO: Setup pipes, redirects, and new process
   // IMPLEMENT_ME();
-
   int pid;
   FILE* file;
-
+  if(p_out)
+  {
+    pipe(p[(current_pipe+1)%2]);
+  }
   pid = fork();
   if(pid == 0)
   {
@@ -421,24 +443,25 @@ void create_process(CommandHolder holder, pid_queue* pid_list) {
     {
       file = fopen(holder.redirect_in, "r");
       dup2(fileno(file), STDIN_FILENO);
-      close(file);
+      fclose(file);
     }
     if(r_out)
     {
-      file = fopen(holder.redirect_out, "w");
-      dup2(fileno(file), STDOUT_FILENO);
-      close(file);
-    }
-    if(r_app)
-    {
-      file = fopen(holder.redirect_out, "a");
-      dup2(fileno(file), STDOUT_FILENO);
-      close(file);
+      if(r_app)
+      {
+        file = fopen(holder.redirect_out, "a");
+        dup2(fileno(file), STDOUT_FILENO);
+        fclose(file);
+      }else{
+        file = fopen(holder.redirect_out, "w");
+        dup2(fileno(file), STDOUT_FILENO);
+        fclose(file);
+      }
     }
     if(p_in)
     {
-      close(p[current_pipe%2][1]);
-      dup2(p[current_pipe%2][0], STDIN_FILENO);
+      close(p[(current_pipe)%2][1]);
+      dup2(p[(current_pipe)%2][0], STDIN_FILENO);
     }
     if(p_out)
     {
@@ -453,12 +476,8 @@ void create_process(CommandHolder holder, pid_queue* pid_list) {
     push_back_pid_queue(pid_list,pid);
     parent_run_command(holder.cmd); // This should be done in the parent branch of a fork
   }
-
-  //parent_run_command(holder.cmd); // This should be done in the parent branch of
-                                  // a fork
-  //child_run_command(holder.cmd); // This should be done in the child branch of a fork
+  current_pipe++;
 }
-
 // Run a list of commands
 void run_script(CommandHolder* holders) {
   if (holders == NULL)
@@ -468,7 +487,7 @@ void run_script(CommandHolder* holders) {
 
   if(num_jobs == 0)
   {
-	big_job_queue = new_job_queue(1);
+	   big_job_queue = new_job_queue(1);
   }
   check_jobs_bg_status();
 
@@ -483,8 +502,11 @@ void run_script(CommandHolder* holders) {
 
   CommandType type;
   // Run all commands in the `holder` array
+
   for (int i = 0; (type = get_command_holder_type(holders[i])) != EOC; ++i)
+  {
     create_process(holders[i],&this_job.pid_list);
+  }
 
   if (!(holders[0].flags & BACKGROUND)) {
     // Not a background Job
