@@ -37,6 +37,10 @@ int num_jobs = 0;
 
 job_queue big_job_queue;
 
+int p[2][2];
+
+int current_pipe = 0;
+
 void delete_job(job* job)
 {
 	//we need a helper function to free memory allocated in each job
@@ -401,36 +405,50 @@ void create_process(CommandHolder holder, pid_queue* pid_list) {
   // TODO: Setup pipes, redirects, and new process
   // IMPLEMENT_ME();
 
+  int pid;
+  FILE* file;
 
-    int pid = 0;
-
-    int p[2];
-
-    pid = fork();
-
-    if(pid == 0)
+  pid = fork();
+  if(pid == 0)
+  {
+    child_run_command(holder.cmd); // This should be done in the child branch of a fork
+    if(r_in)
     {
-		push_back_pid_queue(pid_list,pid);
-
-		parent_run_command(holder.cmd); // This should be done in the parent branch of a fork
-
-      if(p_in)
-      {
-
-      }
-      if(p_out)
-      {
-
-      }
+      fopen(holder.redirect_in, "r");
+      dup2(fileno(file), STDIN_FILENO);
+      close(file);
     }
-
-    else
+    if(r_out)
     {
-		push_back_pid_queue(pid_list,pid);
-
-		child_run_command(holder.cmd); // This should be done in the child branch of a fork
-
+      fopen(holder.redirect_out, "w");
+      dup2(fileno(file), STDOUT_FILENO);
+      close(file);
     }
+    if(r_app)
+    {
+      fopen(holder.redirect_out, "a");
+      dup2(fileno(file), STDOUT_FILENO);
+      close(file);
+    }
+    if(p_in)
+    {
+      close(p[current_pipe%2][1]);
+      dup2(p[current_pipe%2][0], STDIN_FILENO);
+    }
+    if(p_out)
+    {
+      dup2(p[(current_pipe+1)%2][1], STDOUT_FILENO);
+      close(p[(current_pipe+1)%2][0]);
+    }
+  }
+  else
+  {
+    push_back_pid_queue(&pid_list,pid);
+    parent_run_command(holder.cmd); // This should be done in the parent branch of a fork
+  }
+
+  current_pipe++;
+
 
   //parent_run_command(holder.cmd); // This should be done in the parent branch of
                                   // a fork
