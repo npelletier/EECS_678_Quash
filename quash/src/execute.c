@@ -97,17 +97,19 @@ void check_jobs_bg_status() {
  int jobLen = length_job_queue(&big_job_queue);
  for(int i=0;i<num_jobs;i++)
  {
+	 //for each job in big job queue
 	int status;
 	bool running = false;
-	//iterate through jobs queue
 	job temp = pop_front_job_queue(&big_job_queue);
 	int pidLen = length_pid_queue(&temp.pid_list);
+	int temp_pid;
 	for(int j = 0; j < pidLen; j++)
 	{
 		//check each pid in pid_list to see if still running
 		//WNOHANG returns immediately so we don't wait for processes to finish here
 		//returns -1 if an error occurs, 0 if process still running, so we
-		if(waitpid(pop_front_pid_queue(&temp.pid_list),&status, WNOHANG) > 0)
+		temp_pid = pop_front_pid_queue(&temp.pid_list);
+		if(waitpid(temp_pid,&status, WNOHANG) > 0)
 		{
 
 		}else
@@ -117,8 +119,9 @@ void check_jobs_bg_status() {
 			//we can't break though, we still have to iterate through the queue
 			//and put every process back in order
 		}
+		push_back_pid_queue(&temp.pid_list,temp_pid);
 	}
-	if(running)
+	if(!running)
 	{
 		print_job_bg_complete(temp.job_id, peek_front_pid_queue(&temp.pid_list), temp.command_string);
 		delete_job(&temp);
@@ -276,7 +279,7 @@ void run_jobs() {
   for (int i = 0; i < num_jobs; i++)
   {
 	  job temp = pop_front_job_queue(&big_job_queue);
-	  printf("%d\t%d\t%s\n",i,peek_front_pid_queue(&temp.pid_list),temp.command_string);
+	  print_job(temp.job_id, peek_front_pid_queue(&temp.pid_list), temp.command_string);
 	  push_back_job_queue(&big_job_queue,temp);
   }
 
@@ -443,7 +446,7 @@ void create_process(CommandHolder holder, pid_queue* pid_list) {
   }
   else
   {
-    push_back_pid_queue(&pid_list,pid);
+    push_back_pid_queue(pid_list,pid);
     parent_run_command(holder.cmd); // This should be done in the parent branch of a fork
   }
 
