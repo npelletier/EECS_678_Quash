@@ -26,6 +26,7 @@ IMPLEMENT_DEQUE (pid_queue,int);
 typedef struct job {
   int job_id;
   pid_queue pid_list;
+  bool is_background;//we need this to properly free command_string (only in bg)
   char* command_string;//to print the cmd line input when calling jobs
 } job;
 
@@ -36,6 +37,12 @@ int num_jobs = 0;
 
 job_queue big_job_queue;
 
+void delete_job(job* job)
+{
+	//we need a helper function to free memory allocated in each job
+	destroy_pid_queue(&job->pid_list);
+	free(job->command_string);
+}
 // Remove this and all expansion calls to it
 /**
  * @brief Note calls to any function that requires implementation
@@ -78,14 +85,48 @@ void check_jobs_bg_status() {
   // TODO: Check on the statuses of all processes belonging to all background
   // jobs. This function should remove jobs from the jobs queue once all
   // processes belonging to a job have completed.
-  // int jobLen = length_job_queue(&jobs);
-  // for(int i=0;i<num_jobs;i++)
-  // {
-  //   Job temp = pop_front_JobDeque(&jobs);
-  //   int pidLen = length_PIDDeque()
-  // }
-  // TODO: Once jobs are implemented, uncomment and fill the following line
-  // print_job_bg_complete(job_id, pid, cmd);
+  if(is_empty_job_queue(&big_job_queue))
+  {
+	  //dont check for jobs if there are no jobs
+	  return;
+  }
+ int jobLen = length_job_queue(&big_job_queue);
+ for(int i=0;i<num_jobs;i++)
+ {
+	int status;
+	bool running = false;
+	//iterate through jobs queue
+	job temp = pop_front_job_queue(&big_job_queue);
+	int pidLen = length_pid_queue(&temp.pid_list);
+	for(int j = 0; j < pidLen; j++)
+	{
+		//check each pid in pid_list to see if still running
+		//WNOHANG returns immediately so we don't wait for processes to finish here
+		//returns -1 if an error occurs, 0 if process still running, so we
+		if(waitpid(pop_front_pid_queue(&temp.pid_list),&status, WNOHANG) > 0)
+		{
+
+		}else
+		{
+			//a process is still running
+			running = true;
+			//we can't break though, we still have to iterate through the queue
+			//and put every process back in order
+		}
+	}
+	if(running)
+	{
+		print_job_bg_complete(temp.job_id, peek_front_pid_queue(&temp.pid_list), temp.command_string);
+		delete_job(&temp);
+		num_jobs--;//we have one less job in queue
+	}else
+	{
+		//the job still has running processes, so just continue
+		push_back_job_queue(&big_job_queue,temp);
+	}
+	//have to iterate through entire job queue
+  }
+  fflush(stdout);
 }
 
 // Prints the job id number, the process id of the first process belonging to
@@ -180,7 +221,7 @@ void run_cd(CDCommand cmd) {
     return;
   }
 
-  if(chdir(dir))//if we can successfully change working directory
+  if(chdir(dir) == 0)//if we can successfully change working directory
   {
 	  //setenv(variable name, new value, overwrite)
 	  //sets old working directory to previous directory,
@@ -188,6 +229,7 @@ void run_cd(CDCommand cmd) {
 	  setenv(OLD_PWD,PWD,1);
 	  setenv(PWD,dir,1);
   }
+  fflush(stdout);
 }
 
 // Sends a signal to all processes contained in a job
@@ -221,7 +263,18 @@ void run_pwd() {
 // Prints all background jobs currently in the job list to stdout
 void run_jobs() {
   // TODO: Print background jobs
-  IMPLEMENT_ME();
+  //IMPLEMENT_ME();
+  if (num_jobs == 0)
+  {
+	  return;
+  }
+  printf("\n");
+  for (int i = 0; i < num_jobs; i++)
+  {
+	  job temp = pop_front_job_queue(&big_job_queue);
+	  printf("%d\t%d\t%s\n",i,peek_front_pid_queue(&temp.pid_list),temp.command_string);
+	  push_back_job_queue(&big_job_queue,temp);
+  }
 
   // Flush the buffer before returning
   fflush(stdout);
@@ -349,15 +402,18 @@ void create_process(CommandHolder holder, pid_queue* pid_list) {
   // IMPLEMENT_ME();
 
 
-    int pid;
+    int pid = 0;
 
-    int p[2][2];
+    int p[2];
 
     pid = fork();
-    push_back_pid_queue(&pid_list,pid);
+
     if(pid == 0)
     {
-      child_run_command(holder.cmd); // This should be done in the child branch of a fork
+		push_back_pid_queue(pid_list,pid);
+
+		parent_run_command(holder.cmd); // This should be done in the parent branch of a fork
+
       if(p_in)
       {
 
@@ -366,12 +422,14 @@ void create_process(CommandHolder holder, pid_queue* pid_list) {
       {
 
       }
-
     }
 
     else
     {
-      parent_run_command(holder.cmd); // This should be done in the parent branch of a fork
+		push_back_pid_queue(pid_list,pid);
+
+		child_run_command(holder.cmd); // This should be done in the child branch of a fork
+
     }
 
   //parent_run_command(holder.cmd); // This should be done in the parent branch of
@@ -385,8 +443,14 @@ void run_script(CommandHolder* holders) {
   {
     return;
   }
+
+  if(num_jobs == 0)
+  {
+	big_job_queue = new_job_queue(1);
+  }
+
   check_jobs_bg_status();
-  big_job_queue = new_job_queue(1);
+
   if (get_command_holder_type(holders[0]) == EXIT &&
       get_command_holder_type(holders[1]) == EOC) {
     end_main_loop();
@@ -409,8 +473,8 @@ void run_script(CommandHolder* holders) {
   	   waitpid(peek_back_pid_queue(&this_job.pid_list),&status,1);
       // TODO: Wait for all processes under the job to complete
       //IMPLEMENT_ME();
-  	   destroy_pid_queue(&this_job.pid_list);
     }
+	delete_job(&this_job);
   }
   else {
 	  push_back_job_queue(&big_job_queue,this_job);
@@ -422,5 +486,9 @@ void run_script(CommandHolder* holders) {
     // TODO: Once jobs are implemented, uncomment and fill the following line
       print_job_bg_start(this_job.job_id, peek_front_pid_queue(&this_job.pid_list), this_job.command_string);
   }
-  //destroy_pid_queue(&pids);
+  if(num_jobs == 0)
+  {
+	  //this makes it easier (dumber) dealing with job queue deletionc
+	  destroy_job_queue(&big_job_queue);
+  }
 }
