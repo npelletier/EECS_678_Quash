@@ -62,10 +62,10 @@ void delete_job(job* job)
 // Return a string containing the current working directory.
 char* get_current_directory(bool* should_free) {
   // Get the current working directory. This will fix the prompt path.
-  char buf[BUFSIZE];
-  *should_free = false;
-  long size = pathconf(".", _PC_PATH_MAX);//
-  return getcwd(buf, size);
+  //char buf[BUFSIZE];
+  *should_free = true;
+  //long size = pathconf(".", _PC_PATH_MAX);//
+  return get_current_dir_name();
 }
 
 // Returns the value of an environment variable env_var
@@ -89,13 +89,13 @@ void check_jobs_bg_status() {
   // TODO: Check on the statuses of all processes belonging to all background
   // jobs. This function should remove jobs from the jobs queue once all
   // processes belonging to a job have completed.
-  if(is_empty_job_queue(&big_job_queue))
+  if(num_jobs == 0)
   {
 	  //dont check for jobs if there are no jobs
 	  return;
   }
- int jobLen = length_job_queue(&big_job_queue);
- for(int i=0;i<num_jobs;i++)
+ int job_len = length_job_queue(&big_job_queue);//iterate through as many jobs as we have
+ for(int i=0;i<job_len;i++)
  {
 	 //for each job in big job queue
 	int status;
@@ -125,7 +125,6 @@ void check_jobs_bg_status() {
 	{
 		print_job_bg_complete(temp.job_id, peek_front_pid_queue(&temp.pid_list), temp.command_string);
 		delete_job(&temp);
-		num_jobs--;//we have one less job in queue
 	}else
 	{
 		//the job still has running processes, so just continue
@@ -189,8 +188,8 @@ void run_echo(EchoCommand cmd) {
 
   // TODO: Implement echo
   //IMPLEMENT_ME();
-
-  for (char** i =str; *i != NULL; ++i)
+  char** i;
+  for ( i=str; *i != NULL; ++i)
   {
     printf("%s ", *i);
   }
@@ -214,7 +213,11 @@ void run_export(ExportCommand cmd) {
   // TODO: Implement export.
   // HINT: This should be quite simple.
   //IMPLEMENT_ME();
-  setenv(env_var, val, 1);
+  if(setenv(env_var, val, 1) == -1)
+  {
+      printf("ERROR exporting");
+  }
+  fflush(stdout);
 }
 
 // Changes the current working directory
@@ -227,14 +230,13 @@ void run_cd(CDCommand cmd) {
     perror("ERROR: Failed to resolve path");
     return;
   }
-
   if(chdir(dir) == 0)//if we can successfully change working directory
   {
 	  //setenv(variable name, new value, overwrite)
 	  //sets old working directory to previous directory,
-	  char* OLD_PWD;
-	  setenv(OLD_PWD,PWD,1);
-	  setenv(PWD,dir,1);
+	  //char* OLD_PWD;
+	  //setenv(OLD_PWD,PWD,1);
+	  setenv("PWD",dir,1);
   }
   fflush(stdout);
 }
@@ -256,27 +258,28 @@ void run_kill(KillCommand cmd) {
 // Prints the current working directory to stdout
 void run_pwd() {
 	char *pwd_str;//char array to hold our directory
-    //bzero(pwd_str,BUFSIZE);//zero every entry
-    bool should_free;
-    pwd_str = get_current_directory(&should_free);
-    printf("%s\n",pwd_str);
-    if(should_free)
-    {
-  	  free(pwd_str);
-    }
-    fflush(stdout);
+  //bzero(pwd_str,BUFSIZE);//zero every entry
+  bool should_free;
+  pwd_str = get_current_directory(&should_free);
+  printf("%s\n",pwd_str);
+  if(should_free)
+  {
+    free(pwd_str);
+  }
+  fflush(stdout);
 }
 
 // Prints all background jobs currently in the job list to stdout
 void run_jobs() {
   // TODO: Print background jobs
   //IMPLEMENT_ME();
-  if (num_jobs == 0)
+  int job_len = length_job_queue(&big_job_queue);
+  if (job_len <= 0)
   {
 	  return;
   }
-  printf("\n");
-  for (int i = 0; i < num_jobs; i++)
+
+  for (int i = 0; i < job_len; i++)
   {
 	  job temp = pop_front_job_queue(&big_job_queue);
 	  print_job(temp.job_id, peek_front_pid_queue(&temp.pid_list), temp.command_string);
@@ -414,22 +417,21 @@ void create_process(CommandHolder holder, pid_queue* pid_list) {
   pid = fork();
   if(pid == 0)
   {
-    child_run_command(holder.cmd); // This should be done in the child branch of a fork
     if(r_in)
     {
-      fopen(holder.redirect_in, "r");
+      file = fopen(holder.redirect_in, "r");
       dup2(fileno(file), STDIN_FILENO);
       close(file);
     }
     if(r_out)
     {
-      fopen(holder.redirect_out, "w");
+      file = fopen(holder.redirect_out, "w");
       dup2(fileno(file), STDOUT_FILENO);
       close(file);
     }
     if(r_app)
     {
-      fopen(holder.redirect_out, "a");
+      file = fopen(holder.redirect_out, "a");
       dup2(fileno(file), STDOUT_FILENO);
       close(file);
     }
@@ -443,6 +445,8 @@ void create_process(CommandHolder holder, pid_queue* pid_list) {
       dup2(p[(current_pipe+1)%2][1], STDOUT_FILENO);
       close(p[(current_pipe+1)%2][0]);
     }
+    child_run_command(holder.cmd); // This should be done in the child branch of a fork
+    exit (EXIT_SUCCESS);
   }
   else
   {
@@ -466,7 +470,6 @@ void run_script(CommandHolder* holders) {
   {
 	big_job_queue = new_job_queue(1);
   }
-
   check_jobs_bg_status();
 
   if (get_command_holder_type(holders[0]) == EXIT &&
@@ -475,8 +478,8 @@ void run_script(CommandHolder* holders) {
     return;
   }
   job_queue* jobs_ptr = &big_job_queue;
-
   job this_job = {.job_id = ++num_jobs,.pid_list = new_pid_queue(1), .command_string = get_command_string()};
+
 
   CommandType type;
   // Run all commands in the `holder` array
@@ -488,26 +491,25 @@ void run_script(CommandHolder* holders) {
     if(!is_empty_pid_queue(&this_job.pid_list))
     {
     	int status;
-  	   waitpid(peek_back_pid_queue(&this_job.pid_list),&status,1);
+  	  waitpid(peek_back_pid_queue(&this_job.pid_list),&status,1);
       // TODO: Wait for all processes under the job to complete
       //IMPLEMENT_ME();
     }
-	delete_job(&this_job);
-	num_jobs--;
+	  delete_job(&this_job);
   }
   else {
 	  push_back_job_queue(&big_job_queue,this_job);
-	  num_jobs;
     // A background job.
     // TODO: Push the new job to the job queue
     //IMPLEMENT_ME();
 
     // TODO: Once jobs are implemented, uncomment and fill the following line
-      print_job_bg_start(this_job.job_id, peek_front_pid_queue(&this_job.pid_list), this_job.command_string);
+    print_job_bg_start(this_job.job_id, peek_front_pid_queue(&this_job.pid_list), this_job.command_string);
   }
-  if(num_jobs == 0)
+  if(length_job_queue(&big_job_queue) == 0)
   {
-	  //this makes it easier (dumber) dealing with job queue deletionc
+	  //this makes it easier (dumber) dealing with job queue deletion
+    num_jobs = 0;
 	  destroy_job_queue(&big_job_queue);
   }
 }
