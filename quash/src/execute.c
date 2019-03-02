@@ -473,6 +473,10 @@ void create_process(CommandHolder holder, pid_queue* pid_list) {
   }
   else
   {
+	if(p_out)
+	{
+		close((p[(current_pipe+1)%2])[1]);
+	}
     push_back_pid_queue(pid_list,pid);
     parent_run_command(holder.cmd); // This should be done in the parent branch of a fork
   }
@@ -484,19 +488,18 @@ void run_script(CommandHolder* holders) {
   {
     return;
   }
+  check_jobs_bg_status();
 
   if(num_jobs == 0)
   {
 	   big_job_queue = new_job_queue(1);
   }
-  check_jobs_bg_status();
 
   if (get_command_holder_type(holders[0]) == EXIT &&
       get_command_holder_type(holders[1]) == EOC) {
     end_main_loop();
     return;
   }
-  job_queue* jobs_ptr = &big_job_queue;
   job this_job = {.job_id = ++num_jobs,.pid_list = new_pid_queue(1), .command_string = get_command_string()};
 
 
@@ -509,18 +512,18 @@ void run_script(CommandHolder* holders) {
   }
 
   if (!(holders[0].flags & BACKGROUND)) {
-    // Not a background Job
-    if(!is_empty_pid_queue(&this_job.pid_list))
-    {
-    	int status;
-  	  waitpid(peek_back_pid_queue(&this_job.pid_list),&status,1);
-      // TODO: Wait for all processes under the job to complete
-      //IMPLEMENT_ME();
-    }
-	  delete_job(&this_job);
+    int status;
+	int pid;
+	for(int i = 0; i < length_pid_queue(&this_job.pid_list);i++)
+  	{
+		pid = pop_front_pid_queue(&this_job.pid_list);
+		waitpid(pid,&status,1);
+		push_back_pid_queue(&this_job.pid_list,pid);
+	}
+	delete_job(&this_job);
   }
   else {
-	  push_back_job_queue(&big_job_queue,this_job);
+	push_back_job_queue(&big_job_queue,this_job);
     // A background job.
     // TODO: Push the new job to the job queue
     //IMPLEMENT_ME();
@@ -528,6 +531,8 @@ void run_script(CommandHolder* holders) {
     // TODO: Once jobs are implemented, uncomment and fill the following line
     print_job_bg_start(this_job.job_id, peek_front_pid_queue(&this_job.pid_list), this_job.command_string);
   }
+
+
   if(length_job_queue(&big_job_queue) == 0)
   {
 	  //this makes it easier (dumber) dealing with job queue deletion
